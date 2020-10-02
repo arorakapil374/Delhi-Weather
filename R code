@@ -1,0 +1,77 @@
+delhiweather <- read.csv("D:\\R Language\\Project practise (R)\\Weather\\testset.csv", header = TRUE)
+view(delhiweather)
+attach(delhiweather)
+ ## does temperature play a crucial role in the DEW precitipation?
+
+## convert date into proper format
+class(delhiweather$datetime_utc)
+sapply(delhiweather, function (x) sum(is.na(x)))
+
+## anytime and anyday function works well with distributed dates and times
+install.packages("anytime")
+library(anytime)
+delhiweather$datetime_utc <- anytime(delhiweather$datetime_utc)
+
+## select columns to perform the algorithm steps
+
+performweather<- subset(delhiweather, select = c(X_dewptm,X_tempm))
+view(performweather)
+
+## let's replace 0 with means of their columns
+
+performweather$`Dew-Precitipation`[which(is.na(performweather$`Dew-Precitipation`))]<- round(mean(performweather$`Dew-Precitipation`,na.rm = TRUE),0)
+performweather$Temperature[which(is.na(performweather$Temperature))]<- round(mean(performweather$Temperature,na.rm = TRUE),0)
+
+## change the name of both columns
+
+names(performweather)[names(performweather)== "X_dewptm"] <- "Dew-Precitipation"
+names(performweather)[names(performweather)== "X_tempm"]<- "Temperature"
+names(performweather)
+
+##check for the multicolinearity feature ##
+
+colinear_weather <- cor(performweather, method = "pearson")
+colinear_weather
+corrplot (colinear_weather)
+
+### The colinearity if 54% which is not much ##
+## divide the data into train and testing data
+
+split_weather <- sample.split(performweather, SplitRatio = 0.80)
+train_weather <- subset(performweather, split_weather == TRUE)
+test_weather <- subset(performweather, split_weather ==FALSE)
+
+## Create a 10-fold cross validation so that, there should be equal seperation of data
+## it gives better accuracy and reduce overfitting of model.
+library(caret)
+attach(performweather)
+cross_weather <- trainControl(method = "cv", number = 10)
+
+##fit the modal
+linear_weather <- train(`Dew-Precitipation`~ Temperature,
+                        data = train_weather,
+                        method = "lm", trControl = cross_weather,
+                        preProcess = c("scale", "center"))
+summary(linear_weather)
+
+## it has significant effect on the precipitation##
+## check the accuracy of the modal with testing data.
+
+## predict the model
+
+predict_weather <- predict(linear_weather, test_weather)
+predict_weather
+## accuracy of the model
+
+accuracy_weather <- data.frame(cbind(actual = test_weather$`Dew-Precitipation`), predicted = predict_weather)
+head(accuracy_weather)
+cor(accuracy_weather)
+
+## display the linear regression##
+
+ggplot(data = train_weather, aes( x = `Dew-Precitipation`, y = Temperature)) +
+  geom_point(color = "Orange", alpha = 1/10) + theme_minimal(9) + geom_smooth(method = "lm", color = "black") 
+
+
+
+
